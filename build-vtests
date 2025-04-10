@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Generate the initial test files
+# module purge; module load sifive/freedom-tools/toolsuite-linux/
+#make clean
+make hw-tests CORES=4 GCC=riscv64-unknown-linux-gnu-gcc GCCOPTS="-march=rv64gv -D_GNU_SOURCE -DFORCE_AFFINITY -Wall -std=gnu99 -O2 -pthread" -j
+
+# Delete the object files
+rm -f ./hw-tests-src/*.o
+rm -f ./hw-tests-src/run.exe
+
+# Find and remove all tests we don't support.
+grep -lrEZ --include "*.c" "^\"(lr\.|sc\.|amo|xor|add|bn.|be.|or|and)" hw-tests-src \
+| xargs -0 -I{} \
+sh -c 'FILE=$(basename {});
+echo "Removing $FILE";
+grep -Fv "$FILE" hw-tests-src/src >hw-tests-src/src.$$; mv hw-tests-src/src.$$ hw-tests-src/src
+TEST=$(cat {} | grep -F "int argc, char **argv, FILE *out" | sed "s/int \(.*\)(.*/\1/");
+echo "Removing test $TEST";
+grep -Fv "$TEST" hw-tests-src/run.c >hw-tests-src/run.c.$$; mv hw-tests-src/run.c.$$ hw-tests-src/run.c
+'
+
+# maybe #START _litmus_
+# We use lw, 32 bits
+find hw-tests-src -type f -name '*.c' -exec python3 ./x.py {} \;
+
+# Build the tests
+make hw-tests CORES=4 GCC=riscv64-unknown-linux-gnu-gcc GCCOPTS="-march=rv64gv -D_GNU_SOURCE -DFORCE_AFFINITY -Wall -std=gnu99 -O2 -pthread" -j
+
+0 1 2 3 4
